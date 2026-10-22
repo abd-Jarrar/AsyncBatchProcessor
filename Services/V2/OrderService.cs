@@ -1,4 +1,5 @@
 ﻿using AsyncBatchProcessor.Data;
+using AsyncBatchProcessor.Factories;
 using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Models;
 using AsyncBatchProcessor.Requests.V2.OrderItemRequests;
@@ -16,7 +17,8 @@ namespace AsyncBatchProcessor.Services.V2
         ILogger<OrderService> logger,
         IUnitOfWork unitOfWork,
         SemaphoreSlim semaphoreSlim
-        ,AppDbContext context)
+        ,AppDbContext context,
+        NotificationFactory notificationFactory)
     {
         public async Task<Guid> CreateOrderAsync(CreateOrderRequest request, CancellationToken ct)
         {
@@ -72,6 +74,8 @@ namespace AsyncBatchProcessor.Services.V2
                 await unitOfWork.SaveChangesAsync(ct);
                 await unitOfWork.CommitAsync(ct);
                 logger.LogInformation("Order with the id: {OrderId} was created", order.Id);
+                var notificationStrategy=notificationFactory.Create(NotificationType.Sms);
+                await notificationStrategy.SendAsync($"the order with the id: {order.Id} was created successfully");
                 return order.Id;
               
             }

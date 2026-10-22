@@ -1,9 +1,11 @@
 using Asp.Versioning;
 using AsyncBatchProcessor.Data;
 using AsyncBatchProcessor.Exceptions;
+using AsyncBatchProcessor.Factories;
 using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Repositories;
 using AsyncBatchProcessor.Services;
+using AsyncBatchProcessor.Services.V2;
 using AsyncBatchProcessor.Strategies;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +21,10 @@ builder.Services.AddScoped<AsyncBatchProcessor.Services.V1.ProductService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V2.ProductService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V1.OrderService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V2.OrderService>();
+builder.Services.AddScoped<NotificationFactory>();
+builder.Services.AddScoped<SmsNotification>();
+builder.Services.AddScoped<EmailNotification>();
+builder.Services.AddScoped<PushNotification>();
 builder.Services.AddScoped<PricingStrategyFactory>();
 builder.Services.AddScoped<NormalPricingStrategy>();
 builder.Services.AddScoped<VipPricingStrategy>();
