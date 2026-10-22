@@ -75,6 +75,7 @@ namespace AsyncBatchProcessor.Services.V2
                 await unitOfWork.CommitAsync(ct);
                 logger.LogInformation("Order with the id: {OrderId} was created", order.Id);
                 var notificationStrategy=notificationFactory.Create(NotificationType.Sms);
+                notificationStrategy = new LoggingDecorator(notificationStrategy);
                 await notificationStrategy.SendAsync($"the order with the id: {order.Id} was created successfully");
                 return order.Id;
               
