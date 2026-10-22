@@ -30,6 +30,8 @@ namespace AsyncBatchProcessor.Services.V2
 
         public async Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken ct)
         {
+            Console.WriteLine("caching using the decorator ....");
+
             return await productService.GetProductByIdAsync(productId, ct);
         }
 
