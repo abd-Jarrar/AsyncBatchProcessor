@@ -1,4 +1,4 @@
-﻿using AsyncBatchProcessor.Responses;
+﻿using AsyncBatchProcessor.Responses.V1;
 using System.Reflection.Metadata.Ecma335;
 
 namespace AsyncBatchProcessor.Models
