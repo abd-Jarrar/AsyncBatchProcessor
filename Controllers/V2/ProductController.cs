@@ -9,7 +9,7 @@ namespace AsyncBatchProcessor.Controllers.V2
     [ApiController]
     [ApiVersion("2.0")]
     [Route("api/V{version:apiVersion}/products")]
-    public class ProductController(ProductService productService):ControllerBase
+    public class ProductController(CachedProductService productService):ControllerBase
     {
         [HttpGet]
         [Route("productId:guid")]

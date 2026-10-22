@@ -19,6 +19,7 @@ builder.Services.AddScoped<AsyncBatchProcessor.Services.V1.CustomerService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V2.CustomerService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V1.ProductService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V2.ProductService>();
+builder.Services.AddScoped<CachedProductService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V1.OrderService>();
 builder.Services.AddScoped<AsyncBatchProcessor.Services.V2.OrderService>();
 builder.Services.AddScoped<NotificationFactory>();
