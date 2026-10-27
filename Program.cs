@@ -2,6 +2,7 @@ using Asp.Versioning;
 using AsyncBatchProcessor.Data;
 using AsyncBatchProcessor.Exceptions;
 using AsyncBatchProcessor.Factories;
+using AsyncBatchProcessor.Handler.ProductValidation;
 using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Repositories;
 using AsyncBatchProcessor.Services;
@@ -33,6 +34,20 @@ builder.Services.AddScoped<BlackFridayPricingStrategy>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddSingleton<SemaphoreSlim>(new SemaphoreSlim(5, 5));
+builder.Services.AddScoped<ProductActiveHandler>();
+builder.Services.AddScoped<ProductQuantityHandler>();
+builder.Services.AddScoped<IProductValidationHandler>(sp =>
+{
+    var activeHandler =
+        sp.GetRequiredService<ProductActiveHandler>();
+
+    var stockHandler =
+        sp.GetRequiredService<ProductQuantityHandler>();
+
+    activeHandler.SetNextHandler(stockHandler);
+
+    return activeHandler;
+});
 builder.Services.AddApiVersioning(options =>
 {
     options.DefaultApiVersion = new ApiVersion(1, 0);

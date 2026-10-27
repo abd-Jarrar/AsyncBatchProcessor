@@ -9,8 +9,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /src/output .
 
-ENV ASPNETCORE_HTTP_PORTS=5046
-EXPOSE 5046
+ENV ASPNETCORE_HTTP_PORTS=5211
+EXPOSE 5211
  
 ENTRYPOINT ["dotnet", "AsyncBatchProcessor.dll"]
  
