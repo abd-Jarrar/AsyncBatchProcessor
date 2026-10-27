@@ -5,6 +5,7 @@ using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Models;
 using AsyncBatchProcessor.Requests.V2.OrderItemRequests;
 using AsyncBatchProcessor.Requests.V2.OrderRequests;
+using AsyncBatchProcessor.Specifications.Products;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
@@ -21,6 +22,7 @@ namespace AsyncBatchProcessor.Services.V2
         ,AppDbContext context,
         NotificationFactory notificationFactory,
         IProductValidationHandler productValidationHandler,
+        ActiveProductSpecification activeProductSpecification,
         IPaymentService paymentService)
     {
         public async Task<Guid> CreateOrderAsync(CreateOrderRequest request, CancellationToken ct)
@@ -130,7 +132,7 @@ namespace AsyncBatchProcessor.Services.V2
                 throw new KeyNotFoundException($"Product with the id {productId} was not found in the order.");
 
             var product = await products.GetByIdAsync(orderItem.ProductId, ct);
-            if (product is null || !product.IsActive)
+            if (product is null || !activeProductSpecification.IsSatisfiedBy(product))
                 throw new InvalidOperationException("Failed to remove the item because the product is unavailable.");
 
             product.StockQuantity += orderItem.Quantity;
@@ -155,7 +157,7 @@ namespace AsyncBatchProcessor.Services.V2
             foreach (var orderItem in order.OrderItems)
             {
                 var product = await products.GetByIdAsync(orderItem.ProductId, ct);
-                if (product is null || !product.IsActive)
+                if (product is null || !activeProductSpecification.IsSatisfiedBy(product))
                     throw new InvalidOperationException("Failed to cancel the order because it contains unavailable products.");
 
                 product.StockQuantity += orderItem.Quantity;
