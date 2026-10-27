@@ -19,7 +19,9 @@ namespace AsyncBatchProcessor.Services.V2
         IUnitOfWork unitOfWork,
         SemaphoreSlim semaphoreSlim
         ,AppDbContext context,
-        NotificationFactory notificationFactory,IProductValidationHandler productValidationHandler)
+        NotificationFactory notificationFactory,
+        IProductValidationHandler productValidationHandler,
+        IPaymentService paymentService)
     {
         public async Task<Guid> CreateOrderAsync(CreateOrderRequest request, CancellationToken ct)
         {
@@ -62,11 +64,13 @@ namespace AsyncBatchProcessor.Services.V2
                         Quantity = item.Quantity,
                         UnitPrice = product.Price
                     });
+                    await paymentService.PayAsync(item.Quantity*product.Price);
                 }
 
                 await orders.AddAsync(order, ct);
                 await unitOfWork.SaveChangesAsync(ct);
                 await unitOfWork.CommitAsync(ct);
+                
                 logger.LogInformation("Order with the id: {OrderId} was created", order.Id);
                 var notificationStrategy=notificationFactory.Create(NotificationType.Sms);
                 notificationStrategy = new LoggingDecorator(notificationStrategy);
