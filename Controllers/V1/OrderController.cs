@@ -80,7 +80,6 @@ namespace AsyncBatchProcessor.Controllers.V1
         [Route("cancel/{orderId:guid}")]
         public async Task<IActionResult> CancelOrder(Guid orderId, CancellationToken ct)
         {
-
             bool isDeleted = await orderService.CancelOrderAsync(orderId, ct);
             if (isDeleted)
                 return NoContent();

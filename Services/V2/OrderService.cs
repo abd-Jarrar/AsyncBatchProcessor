@@ -1,4 +1,5 @@
-﻿using AsyncBatchProcessor.Data;
+﻿using AsyncBatchProcessor.Controllers.V2;
+using AsyncBatchProcessor.Data;
 using AsyncBatchProcessor.Factories;
 using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Models;
@@ -18,7 +19,7 @@ namespace AsyncBatchProcessor.Services.V2
         IUnitOfWork unitOfWork,
         SemaphoreSlim semaphoreSlim
         ,AppDbContext context,
-        NotificationFactory notificationFactory)
+        NotificationFactory notificationFactory,IProductValidationHandler productValidationHandler)
     {
         public async Task<Guid> CreateOrderAsync(CreateOrderRequest request, CancellationToken ct)
         {
@@ -49,14 +50,7 @@ namespace AsyncBatchProcessor.Services.V2
                     if (product is null)
                         throw new KeyNotFoundException($"Product with the id {item.ProductId} was not found.");
 
-                    if (!product.IsActive)
-                        throw new InvalidOperationException($"Product with the id {item.ProductId} is inactive.");
-
-                    if (item.Quantity > product.StockQuantity)
-                    {
-                        logger.LogWarning("There is not enough stock for product {ProductId}", product.Id);
-                        throw new InvalidOperationException($"There is not enough stock for product {product.Id}.");
-                    }
+                    productValidationHandler.Handle(product,item.Quantity);
 
                     product.StockQuantity -= item.Quantity;
 
@@ -93,9 +87,7 @@ namespace AsyncBatchProcessor.Services.V2
 
         public async Task AddItemAsync(Guid orderId, AddOrderItemRequest request, CancellationToken ct)
         {
-            if (request.Quantity <= 0)
-                throw new ValidationException("Item quantity must be greater than zero.");
-
+            
             var order = await orders.GetByIdAsync(orderId, ct);
             if (order is null)
                 throw new KeyNotFoundException($"Order with the id {orderId} was not found.");
@@ -107,14 +99,7 @@ namespace AsyncBatchProcessor.Services.V2
             if (product is null)
                 throw new KeyNotFoundException($"Product with the id {request.ProductId} was not found.");
 
-            if (!product.IsActive)
-                throw new InvalidOperationException("Cannot add an inactive product to an order.");
-
-            if (product.StockQuantity < request.Quantity)
-            {
-                logger.LogWarning("There is not enough stock for product {ProductId}", product.Id);
-                throw new InvalidOperationException("There is not enough quantity in the stock.");
-            }
+            productValidationHandler.Handle(product,request.Quantity);
 
             product.StockQuantity -= request.Quantity;
 
