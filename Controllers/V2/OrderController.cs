@@ -1,10 +1,12 @@
 ﻿using Asp.Versioning;
+using AsyncBatchProcessor.Common;
 using AsyncBatchProcessor.Models;
 using AsyncBatchProcessor.Requests.V2.OrderItemRequests;
 using AsyncBatchProcessor.Requests.V2.OrderRequests;
 using AsyncBatchProcessor.Responses.V2.BatchResponse;
 using AsyncBatchProcessor.Services.V2;
 using AsyncBatchProcessor.Strategies;
+
 using Microsoft.AspNetCore.Mvc;
 
 namespace AsyncBatchProcessor.Controllers.V2
@@ -18,14 +20,14 @@ namespace AsyncBatchProcessor.Controllers.V2
         [Route("{orderId:guid}")]
         public async Task<IActionResult> GetOrderById(Guid orderId, CancellationToken ct)
         {
-            var order = await orderService.GetOrderByIdAsync(orderId, ct);
-            if (order is null)
+            var result = await orderService.GetOrderByIdForReadAsync(orderId, ct);
+            if (result.IsFailure)
                 return NotFound(new ProblemDetails
                 {
                     Title = "no order was found",
-                    Detail = $"order with the id {orderId} was not found"
+                    Detail = result.Error
                 });
-            return Ok(order.ToResponse());
+            return Ok(result.Value);
         }
 
         [HttpGet]
@@ -38,41 +40,73 @@ namespace AsyncBatchProcessor.Controllers.V2
                     Title = "no orders found",
                     Detail = "there is no orders right now"
                 });
-            return Ok(orders.Select(o=>o.ToResponse()).ToList());
+            return Ok(orders);
         }
 
         [HttpPut]
         [Route("{orderId}/{status}")]
         public async Task<IActionResult> UpdateOrderStatus(Guid orderId, OrderStatus status, CancellationToken ct)
         {
-            await orderService.UpdateStatus(orderId, status, ct);
-            return NoContent();
+            var result=await orderService.UpdateStatus(orderId, status, ct);
+            if(result.IsSuccess)
+                return NoContent();
+            else
+                return Problem(
+                    detail: result.Error,
+                    statusCode: result.ErrorStatusCode,
+                    title: "Failed to update order status"
+                    );
         }
 
         [HttpPost("{orderId:guid}/items")]
         public async Task<IActionResult> AddOrderItem(Guid orderId, [FromBody] AddOrderItemRequest request, CancellationToken ct)
         {
-            await orderService.AddItemAsync(orderId, request, ct);
+            var result=await orderService.AddItemAsync(orderId, request, ct);
+            if( result.IsSuccess)
+                return NoContent();
 
-            return NoContent();
+            else
+                return Problem(
+                    detail: result.Error,
+                    statusCode: result.ErrorStatusCode,
+                    title: "Failed to add the item to the order "
+                    );
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateOrder(CreateOrderRequest request, CancellationToken ct)
         {
-            var orderId = await orderService.CreateOrderAsync(request, ct);
-            var strategy = pricingStrategyFactory.GetStrategy(request.PricingStrategy);
-            return Created(
-                $"/api/orders/{orderId}",
-                new { orderId,PricingStrategy=(strategy.GetType().Name) });
+            var result = await orderService.CreateOrderAsync(request, ct);
+            if (result.IsSuccess)
+            {
+                var strategy = pricingStrategyFactory.GetStrategy(request.PricingStrategy);
+                return Created(
+                    $"/api/orders/{result.Value}",
+                    new { result.Value, PricingStrategy = (strategy.GetType().Name) });
+            }
+            else
+                   return Problem(
+                    detail: result.Error,
+                    statusCode: result.ErrorStatusCode,
+                    title: "Failed to Create the Order "
+                    );
         }
 
         [HttpDelete]
         [Route("{orderId:guid}/items/{itemId:guid}")]
         public async Task<IActionResult> RemoveItem(Guid orderId, Guid itemId, CancellationToken ct)
         {
-            await orderService.RemoveItemAsync(orderId, itemId, ct);
-            return NoContent();
+            var result=await orderService.RemoveItemAsync(orderId, itemId, ct);
+            if(result.IsSuccess)
+                return NoContent();
+            else
+            {
+                return Problem(
+                    detail: result.Error,
+                    statusCode: result.ErrorStatusCode,
+                    title: "Failed to to remove the item from the order "
+                    );
+            }
         }
 
         [HttpPost]
@@ -80,16 +114,16 @@ namespace AsyncBatchProcessor.Controllers.V2
         public async Task<IActionResult> CancelOrder(Guid orderId, CancellationToken ct)
         {
 
-            bool isDeleted = await orderService.CancelOrderAsync(orderId, ct);
-            if (isDeleted)
+            var result= await orderService.CancelOrderAsync(orderId, ct);
+            if (result.IsSuccess)
                 return NoContent();
             else
             {
-                return NotFound(new ProblemDetails
-                {
-                    Title = "cancelling failed",
-                    Detail = "order with the id {orderId} was not found"
-                });
+                return Problem(
+                   detail: result.Error,
+                   statusCode: result.ErrorStatusCode,
+                   title: "Failed to to cancel the order "
+                   );
             }
 
         }
@@ -98,7 +132,7 @@ namespace AsyncBatchProcessor.Controllers.V2
         [Route("createOrders")]
         public async Task<IActionResult> ProcessOrdersAsync(List<CreateOrderRequest> requests, CancellationToken ct)
         {
-            List<Task<Guid>> tasks = new List<Task<Guid>>();
+            List<Task<Result<Guid>>> tasks = new List<Task<Result<Guid>>>();
 
 
              tasks = requests.Select(async request =>
@@ -111,32 +145,22 @@ namespace AsyncBatchProcessor.Controllers.V2
                 return await orderService.CreateOrderAsync(request, ct);
             }).ToList();
 
-            
-            //foreach(var request in requests)
-            //{
-            //    var scopedOrderService = scope.ServiceProvider.GetRequiredService<OrderService>();
-            //     tasks.Add(scopedOrderService.CreateOrderAsync(request, ct));
 
-            //}
             try
             {
                 await Task.WhenAll(tasks);
-                //await Task.WhenAll(requests.Select(async  (r)=>  {
-                //    using var scope = factory.CreateAsyncScope();
-                //    var scopedOrderService = scope.ServiceProvider.GetRequiredService<OrderService>();
-                //    return await scopedOrderService.CreateOrderAsync(r, ct);
-                //    }));
+
             }
             catch(Exception ex)
             {
-            
+                
             }
             var tasksWithIndexes=tasks.Select((t,i)=>new {task=t,index=i,isSuccesfull=t.IsCompletedSuccessfully}).ToList();
             return Ok(new BatchResult
             {
                 TotalOrders = tasks.Count,
                 FailedOrders = tasksWithIndexes.Where(t => t.isSuccesfull == false).Select(t => new FailedOrderResult (t.index,t.task.Exception?.Message??"operation was cancelled")).ToList(),
-                SuccessfulOrders = tasksWithIndexes.Where(t => t.isSuccesfull == true).Select(t => new OrderResult(t.task.Result)).ToList(),
+                SuccessfulOrders = tasksWithIndexes.Where(t => t.isSuccesfull == true).Select(t => new OrderResult(t.task.Result.Value)).ToList(),
                 
             });
 

@@ -15,16 +15,16 @@ namespace AsyncBatchProcessor.Controllers.V2
         [Route("productId:guid")]
         public async Task<IActionResult> GetProductById(Guid productId,CancellationToken ct)
         {
-            var product = await productService.GetProductByIdAsync(productId, ct);
-            if (product is null)
+            var result = await productService.GetProductByIdAsync(productId, ct);
+            if (result.IsFailure)
                 return NotFound(new ProblemDetails
                 {
                     Title = "product was not found",
-                    Detail = $"product with the id {productId} was not found"
+                    Detail = result.Error
                 });
             else
             {
-                return Ok(product.ToResponse());
+                return Ok(result.Value);
             }
 
         }
@@ -33,19 +33,19 @@ namespace AsyncBatchProcessor.Controllers.V2
         [Route("{name}")]
         public async Task<IActionResult> GetProductByName(string name, CancellationToken ct)
         {
-            var product = await productService
+            var result = await productService
                 .GetProductByNameAsync(name, ct);
 
-            if (product is null)
+            if (result.IsFailure)
             {
                 return NotFound(new ProblemDetails
                 {
                     Title = "Product was not found",
-                    Detail = $"No product with the name '{name}' was found."
+                    Detail = result.Error
                 });
             }
 
-            return Ok(product.ToResponse());
+            return Ok(result.Value);
         }
 
         [HttpGet]
@@ -62,7 +62,7 @@ namespace AsyncBatchProcessor.Controllers.V2
             }
             else
             {
-                return Ok(products.Select(p => p.ToResponse()).ToList());
+                return Ok(products);
                
             }
 
@@ -72,36 +72,37 @@ namespace AsyncBatchProcessor.Controllers.V2
         [HttpGet("max-price")]
         public async Task<IActionResult> GetProductWithMaximumPrice(CancellationToken ct)
         {
-            var product = await productService
+            var result = await productService
                 .GetProductWithMaximumPriceAsync(ct);
 
-            if (product is null)
+            if (result.IsFailure)
             {
                 return NotFound(new ProblemDetails
                 {
                     Title = "There are no products",
-                    Detail = "There are no products right now."
+                    Detail = result.Error
                 });
             }
 
-            return Ok(product.ToResponse());
+            return Ok(result.Value);
         }
 
         [HttpDelete]
         [Route("{productId:guid}")]
         public async Task<IActionResult> DeleteProduct(Guid productId, CancellationToken ct)
         {
-            var isDeleted = await productService.DeleteProductByIdAsync(productId, ct);
-
-            if (isDeleted)
-                return NoContent();
-            else
+            var result = await productService.DeleteProductByIdAsync(productId, ct);
+            if (result.IsFailure)
             {
                 return NotFound(new ProblemDetails
                 {
                     Title = "prouct was not found",
-                    Detail = $"Product with the id: {productId} was not found"
+                    Detail = result.Error
                 });
+            }
+            else
+            {
+                return NoContent();
             }
         }
 
@@ -109,17 +110,19 @@ namespace AsyncBatchProcessor.Controllers.V2
         [HttpPost]
         public async Task<IActionResult> AddProduct(CreateProductRequest request,CancellationToken ct)
         {
-            var id = await productService.CreateProductAsync(
+            var result = await productService.CreateProductAsync(
     request.Name,
     request.SKU,
     request.Price,
     request.stockQuantity,
     ct);
-
-            return CreatedAtAction(
-                nameof(GetProductById),
-                new { productId = id },
-                new { id });
+            if (result.IsSuccess)
+                return CreatedAtAction(
+                    nameof(GetProductById),
+                    new { productId = result.Value },
+                    new { result.Value });
+            else
+                return Conflict();
         }
 
 

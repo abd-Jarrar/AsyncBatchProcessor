@@ -13,19 +13,16 @@ namespace AsyncBatchProcessor.Controllers.V2
     {
         [HttpGet]
         [Route("{customerId:guid}")]
-        public async Task<IActionResult> GetCustomerById(Guid customerId,CancellationToken ct)
+        public async Task<IActionResult> GetCustomerById(Guid customerId, CancellationToken ct)
         {
-            var customer =  await customerService.GetCustomerByIdAsync(customerId, ct);
-            if (customer is null)
-                return NotFound(new ProblemDetails()
-                {
-                    Title="not found",
-                    Detail=$"customer with the id {customerId} was not found"
-                });
+            var result = await customerService.GetCustomerByIdAsync(customerId, ct);
+            if (result.IsFailure)
+            {
+                return NotFound(result);
+            }
             else
             {
-                return Ok(customer.ToResponse());
-
+                return Ok(result.Value);
             }
         }
 
@@ -41,8 +38,7 @@ namespace AsyncBatchProcessor.Controllers.V2
                 });
             else
             {
-                
-                return Ok(customers.Select(c=>c.ToResponse()).ToList());
+                return Ok(customers);
             }
         }
 
@@ -71,33 +67,34 @@ namespace AsyncBatchProcessor.Controllers.V2
         [Route("{customerId:guid}")]
         public async Task<IActionResult> DelteCustomer(Guid customerId,CancellationToken ct)
         {
-            
-            var isDeleted = await customerService.DeleteCustomerByIdAsync(customerId,ct);
-            if (isDeleted)
+            var result = await customerService.DeleteCustomerByIdAsync(customerId,ct);
+            if (result.IsSuccess)
                 return NoContent();
             else
             {
-                return NotFound(new ProblemDetails()
-                {
-                    Title= "customer  was not found",
-                    Detail= "Customer with the id: {customerId} was not found"
-                });
+                return NotFound(result.Error);
             }
         }
 
         [HttpPost]
         public async Task<IActionResult> AddCustomer(CreateCustomerRequest request,CancellationToken ct)
         {
-            var customerId = await customerService.CreateCustomerAsync(
+            var result = await customerService.CreateCustomerAsync(
                 request.Name,
                 request.Email,
                 request.Phone,
                 ct);
-
-            return CreatedAtAction(
-                nameof(GetCustomerById),
-                new { customerId },
-                new { id = customerId });
+            if (result.IsSuccess)
+            {
+                return CreatedAtAction(
+               nameof(GetCustomerById),
+               new { result.Value },
+               new { id = result.Value });
+            }
+            else
+            {
+                return Conflict(result.Error);
+            }
         }
 
         [HttpGet]

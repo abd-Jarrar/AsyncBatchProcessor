@@ -1,23 +1,19 @@
-﻿using AsyncBatchProcessor.Interfaces;
+﻿using AsyncBatchProcessor.Common;
+using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Models;
+using AsyncBatchProcessor.Responses.V2;
 using System.ComponentModel.DataAnnotations;
 
 namespace AsyncBatchProcessor.Services.V2
 {
     public class ProductService(IProductRepository repo)
     {
-        public async Task<Guid> CreateProductAsync(
+        public async Task<Result<Guid>> CreateProductAsync(
             string productName, string sku, decimal productPrice, int? stockQuantity, CancellationToken ct)
         {
             // Business rules
-            if (productPrice < 0)
-                throw new ValidationException("Price cannot be negative.");
-
-            if (stockQuantity is < 0)
-                throw new ValidationException("Stock cannot be negative.");
-
             if (await repo.SkuExistsAsync(sku, ct))
-                throw new InvalidOperationException($"A product with SKU '{sku}' already exists.");
+                return Result<Guid>.Failure($"A product with SKU '{sku}' already exists.",StatusCodes.Status409Conflict);
 
             var product = new Product
             {
@@ -31,39 +27,72 @@ namespace AsyncBatchProcessor.Services.V2
 
             await repo.AddAsync(product, ct);
             await repo.SaveChangesAsync(ct);
-            return product.Id;
+            return Result<Guid>.Success(product.Id);
         }
 
-        public async Task<bool> DeleteProductByIdAsync(Guid productId, CancellationToken ct)
+        public async Task<Result<bool>> DeleteProductByIdAsync(Guid productId, CancellationToken ct)
         {
             var product = await repo.GetByIdAsync(productId, ct);
             if (product is null)
-                return false;
+                return Result<bool>.Failure($"the product with the id: {productId} was not found", StatusCodes.Status404NotFound);
 
             repo.Remove(product);
             await repo.SaveChangesAsync(ct);
-            return true;
+            return Result<bool>.Success(true);
         }
 
-        public Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken ct) =>
-            repo.GetByIdAsync(productId, ct);
+        public async Task<Result<ProductResponse>>  GetProductByIdAsync(Guid productId, CancellationToken ct) {
 
-        public Task<Product?> GetProductByNameAsync(string productName, CancellationToken ct) =>
-            repo.GetByNameAsync(productName, ct);
+            var product = await repo.GetByIdAsync(productId, ct);
+            if (product is null)
+                return Result<ProductResponse>.Failure($"the product with the id: {productId} was not found",StatusCodes.Status404NotFound);
+            else
+                return Result<ProductResponse>.Success(product.ToResponse());
+        }
 
-        public Task<Product?> GetProductWithMaximumPriceAsync(CancellationToken ct) =>
-            repo.GetMaxPriceAsync(ct);
+        public async Task<Result<ProductResponse>> GetProductByNameAsync(string productName, CancellationToken ct) {
+        
+            var product=await repo.GetByNameAsync(productName, ct);
+            if (product is null)
+                return Result<ProductResponse>.Failure($"the product with the name {productName} was not found",StatusCodes.Status404NotFound);
+            else
+                return Result<ProductResponse>.Success(product.ToResponse());
+        }
 
-        public Task<Product?> GetProductWithMinimumPriceAsync(CancellationToken ct) =>
-            repo.GetMinPriceAsync(ct);
+        public async Task<Result<ProductResponse>> GetProductWithMaximumPriceAsync(CancellationToken ct)
+        {
+            var product = await repo.GetMaxPriceAsync(ct);
+            if (product is null)
+                return Result<ProductResponse>.Failure("there is no products right now!!!", StatusCodes.Status404NotFound);
+            else
+                return Result<ProductResponse>.Success(product.ToResponse());
+        }
 
-        public Task<List<Product>> GetAllProductsAsync(CancellationToken ct) =>
-            repo.GetAllAsync(ct);
+        public async Task<Result<ProductResponse>> GetProductWithMinimumPriceAsync(CancellationToken ct){
+        
+            var product=await repo.GetMinPriceAsync(ct);
+            if (product is null)
+                return Result<ProductResponse>.Failure("there is no products right now!!!", StatusCodes.Status404NotFound);
+            else
+                return Result<ProductResponse>.Success(product.ToResponse());
+        }
 
-        public Task<List<Product>> GetProductWithStockAsync(int stockQuantity, CancellationToken ct) =>
-            repo.GetWithStockAsync(stockQuantity, ct);
+        public async Task<List<ProductResponse>> GetAllProductsAsync(CancellationToken ct) {
 
-        public Task<List<Product>> GetActiveProductsAsync(CancellationToken ct) =>
-            repo.GetActiveAsync(ct);
+            var products = await repo.GetAllAsync(ct);
+            return products.Select(p => p.ToResponse()).ToList();
+        }
+
+        public async Task<List<ProductResponse>> GetProductWithStockAsync(int stockQuantity, CancellationToken ct)
+        {
+            var products = await repo.GetWithStockAsync(stockQuantity, ct);
+            return products.Select(p => p.ToResponse()).ToList();
+        }
+
+        public async Task<List<ProductResponse>> GetActiveProductsAsync(CancellationToken ct)
+        {
+            var products=await repo.GetActiveAsync(ct);
+            return products.Select(p => p.ToResponse()).ToList();
+        }
     }
 }
