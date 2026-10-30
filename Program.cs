@@ -17,6 +17,11 @@ builder.Services.AddProblemDetails();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.InstanceName = "App1";
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+});
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CachedProductService>();
