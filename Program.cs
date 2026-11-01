@@ -23,6 +23,14 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "App1";
     options.Configuration = builder.Configuration.GetConnectionString("Redis");
 });
+builder.Services.AddHybridCache(options =>
+{
+    options.DefaultEntryOptions = new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(1),
+        LocalCacheExpiration = TimeSpan.FromSeconds(5)
+    };
+});
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CachedProductService>();

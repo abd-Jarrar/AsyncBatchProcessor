@@ -2,11 +2,12 @@
 using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Models;
 using AsyncBatchProcessor.Responses.V2;
+using Microsoft.Extensions.Caching.Hybrid;
 using System.ComponentModel.DataAnnotations;
 
 namespace AsyncBatchProcessor.Services.V2
 {
-    public class ProductService(IProductRepository repo)
+    public class ProductService(IProductRepository repo,HybridCache hybridCache,ILogger<ProductService> logger)
     {
         public async Task<Result<Guid>> CreateProductAsync(
             string productName, string sku, decimal productPrice, int? stockQuantity, CancellationToken ct)
@@ -41,13 +42,30 @@ namespace AsyncBatchProcessor.Services.V2
             return Result<bool>.Success(true);
         }
 
-        public async Task<Result<ProductResponse>>  GetProductByIdAsync(Guid productId, CancellationToken ct) {
+        public async Task<Result<ProductResponse>> GetProductByIdAsync(
+    Guid productId,
+    CancellationToken ct)
+        {
+            var cacheKey = $"products:{productId}";
 
-            var product = await repo.GetByIdAsync(productId, ct);
+            var product = await hybridCache.GetOrCreateAsync(
+                cacheKey,
+                async (token) =>
+                {
+                    logger.LogInformation("DATABASE VISITED for ID:{productId}",productId);
+                    return await repo.GetByIdAsync(productId, token);
+                },
+                cancellationToken: ct
+            );
+
             if (product is null)
-                return Result<ProductResponse>.Failure($"the product with the id: {productId} was not found",StatusCodes.Status404NotFound);
-            else
-                return Result<ProductResponse>.Success(product.ToResponse());
+            {
+                return Result<ProductResponse>.Failure(
+                    $"The product with the id: {productId} was not found",
+                    StatusCodes.Status404NotFound);
+            }
+
+            return Result<ProductResponse>.Success(product.ToResponse());
         }
 
         public async Task<Result<ProductResponse>> GetProductByNameAsync(string productName, CancellationToken ct) {
