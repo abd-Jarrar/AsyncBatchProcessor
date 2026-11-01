@@ -1,1 +1,4 @@
 @baseUrl=http://localhost:5046
+@productId=55555555-5555-5555-5555-555555555555
+GET 
+

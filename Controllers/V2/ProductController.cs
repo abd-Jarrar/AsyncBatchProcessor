@@ -1,18 +1,21 @@
 ﻿using Asp.Versioning;
+using AsyncBatchProcessor.Common;
 using AsyncBatchProcessor.Models;
 using AsyncBatchProcessor.Requests.V2.ProductRequests;
+using AsyncBatchProcessor.Responses.V2;
 using AsyncBatchProcessor.Services.V2;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace AsyncBatchProcessor.Controllers.V2
 {
     [ApiController]
     [ApiVersion("2.0")]
     [Route("api/V{version:apiVersion}/products")]
-    public class ProductController(CachedProductService productService):ControllerBase
+    public class ProductController(CachedProductService productService,HybridCache hybridCache):ControllerBase
     {
         [HttpGet]
-        [Route("productId:guid")]
+        [Route("{productId:guid}")]
         public async Task<IActionResult> GetProductById(Guid productId,CancellationToken ct)
         {
             var result = await productService.GetProductByIdAsync(productId, ct);
@@ -141,6 +144,29 @@ namespace AsyncBatchProcessor.Controllers.V2
                 return Ok(products);
         }
 
+        [HttpGet]
+        [Route("cacheStampade/{productId:guid}")]
+        public async Task<IActionResult> GetProductByCache(Guid productId,CancellationToken ct)
+        {
+            List<Task<Result<ProductResponse>>> tasks = new();
+            for(int i = 0; i < 100; i++)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    return await productService.GetProductByIdAsync(productId, ct);
+                }));
+            }
+            await Task.WhenAll(tasks);
+            return Ok(tasks.Select(t => t.Result).ToList());
 
+        }
+        [HttpPost]
+        [Route("evict/{productId:guid}")]
+        public async Task<IActionResult> InvalidateCache(Guid productId,CancellationToken ct)
+        {
+            var cacheKey = $"products:{productId}";
+            await hybridCache.RemoveAsync(cacheKey, ct);
+            return Ok($"product with the id {productId} was invalidated successfully");
+        }
     }
 }

@@ -7,6 +7,7 @@ using AsyncBatchProcessor.Interfaces;
 using AsyncBatchProcessor.Repositories;
 using AsyncBatchProcessor.Services;
 using AsyncBatchProcessor.Services.V2;
+using AsyncBatchProcessor.Specifications.Products;
 using AsyncBatchProcessor.Strategies;
 using AsyncBatchProcessor.ThridPartyService;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,7 @@ builder.Services.AddHybridCache(options =>
 {
     options.DefaultEntryOptions = new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
     {
-        Expiration = TimeSpan.FromMinutes(1),
+        Expiration = TimeSpan.FromMinutes(10),
         LocalCacheExpiration = TimeSpan.FromSeconds(5)
     };
 });
@@ -48,6 +49,8 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddSingleton<SemaphoreSlim>(new SemaphoreSlim(5, 5));
 builder.Services.AddScoped<ProductActiveHandler>();
 builder.Services.AddScoped<ProductQuantityHandler>();
+builder.Services.AddScoped<ActiveProductSpecification>();
+
 builder.Services.AddScoped<IProductValidationHandler>(sp =>
 {
     var activeHandler =

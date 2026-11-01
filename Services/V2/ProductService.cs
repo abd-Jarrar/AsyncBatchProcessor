@@ -42,30 +42,33 @@ namespace AsyncBatchProcessor.Services.V2
             return Result<bool>.Success(true);
         }
 
-        public async Task<Result<ProductResponse>> GetProductByIdAsync(
-    Guid productId,
-    CancellationToken ct)
+        public async Task<Result<ProductResponse>> GetProductByIdAsync(Guid productId,CancellationToken ct)
         {
             var cacheKey = $"products:{productId}";
-
+            Console.WriteLine("---------------------------------");
             var product = await hybridCache.GetOrCreateAsync(
                 cacheKey,
                 async (token) =>
                 {
-                    logger.LogInformation("DATABASE VISITED for ID:{productId}",productId);
+                    Console.WriteLine($"DATABASE VISITED for ID:{productId}");
                     return await repo.GetByIdAsync(productId, token);
                 },
                 cancellationToken: ct
             );
+            Console.WriteLine($"Cache VISITED for ID:{productId}");
 
             if (product is null)
             {
+                Console.WriteLine("here");
                 return Result<ProductResponse>.Failure(
                     $"The product with the id: {productId} was not found",
                     StatusCodes.Status404NotFound);
             }
 
             return Result<ProductResponse>.Success(product.ToResponse());
+
+
+
         }
 
         public async Task<Result<ProductResponse>> GetProductByNameAsync(string productName, CancellationToken ct) {
