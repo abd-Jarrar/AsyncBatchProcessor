@@ -17,6 +17,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddHealthChecks();
 builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.InstanceName = "App1";
@@ -65,12 +66,12 @@ builder.Services.AddDbContext<AppDbContext>((options) =>
 builder.Services.AddSingleton<ThirdPartyPayment>();
 builder.Services.AddScoped<IPaymentService, PaymentAdapterService>();
 var app = builder.Build();
-app.MapControllers();
 if (!app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
-app.UseExceptionHandler();
-app.MapControllers();
 
+app.UseExceptionHandler();
+app.MapHealthChecks("/health");
+app.MapControllers();
 app.Run();
