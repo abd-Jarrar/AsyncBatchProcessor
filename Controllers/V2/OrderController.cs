@@ -166,6 +166,24 @@ namespace AsyncBatchProcessor.Controllers.V2
 
             
         }
+        
+        [HttpGet]
+        [Route("report/slow")]
+        public async Task<IActionResult> GetReportSlow([FromQuery] int page = 1,[FromQuery] int pageSize = 20)
+        {
+            var result = await orderService.GetOrdersReportSlow(page, pageSize);
+
+            return Ok(result);
+        }
+
+        [HttpGet]
+        [Route("report/fast")]
+        public async Task<IActionResult> GetReportFast([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await orderService.GetOrdersReportFast(page, pageSize);
+
+            return Ok(result);
+        }
 
 
     }
