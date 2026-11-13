@@ -217,11 +217,11 @@ namespace AsyncBatchProcessor.Services.V2
         {
             var stopwatch = Stopwatch.StartNew();
 
-            // Loads ALL orders from the database
+            
             var allOrders = await context.Orders
                 .ToListAsync();
 
-            // Everything below happens in application memory
+            
             var orders = allOrders
                 .Where(o => o.Status == OrderStatus.Completed)
                 .OrderByDescending(o => o.CreatedAt)
