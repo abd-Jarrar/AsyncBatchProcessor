@@ -11,6 +11,7 @@ using AsyncBatchProcessor.Specifications.Products;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Reflection.Metadata.Ecma335;
 
 namespace AsyncBatchProcessor.Services.V2
@@ -212,6 +213,60 @@ namespace AsyncBatchProcessor.Services.V2
                 return Result<OrderResponse>.Success(order.ToResponse());
         }
 
+        public async Task<Result<List<OrderResponse>>> GetOrdersReportSlow(int page = 1 ,int pageSize = 20)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            // Loads ALL orders from the database
+            var allOrders = await context.Orders
+                .ToListAsync();
+
+            // Everything below happens in application memory
+            var orders = allOrders
+                .Where(o => o.Status == OrderStatus.Completed)
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(o => new OrderResponse(
+                    o.Id,
+                    o.CustomerId,
+                    o.Status,
+                    o.TotalAmount,
+                    o.CreatedAt))
+                .ToList();
+
+            stopwatch.Stop();
+
+            Console.WriteLine($"Execution time: {stopwatch.ElapsedMilliseconds} ms");
+
+            return Result<List<OrderResponse>>.Success(orders);
+        }
+
+        public async Task<Result<List<OrderResponse>>> GetOrdersReportFast(int page = 1,int pageSize = 20)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            var orders = await context.Orders
+                .AsNoTracking()
+                .Where(o => o.Status == OrderStatus.Pending)
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(o => new OrderResponse(
+                    o.Id,
+                    o.CustomerId,
+                    o.Status,
+                    o.TotalAmount,
+                    o.CreatedAt))
+                .ToListAsync();
+
+            stopwatch.Stop();
+
+            Console.WriteLine(
+                $"Execution time: {stopwatch.ElapsedMilliseconds} ms");
+
+            return Result<List<OrderResponse>>.Success(orders);
+        }
         public async Task<List<OrderResponse>> GetAllOrdersAsync(CancellationToken ct)
         {
             var result=await orders.GetAllAsync(ct);
